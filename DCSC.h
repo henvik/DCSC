@@ -1,8 +1,7 @@
 #ifndef DCSC_INCLUDED
 #define DCSC_INCLUDED
 
-
-
-void DCSC(LinkedList* G);
+LinkedList* DCSC_parallel(LinkedList* G, int cutoff);
+LinkedList* DCSC_serial(LinkedList* G);
 
 #endif

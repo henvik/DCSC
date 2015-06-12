@@ -1,7 +1,9 @@
 #ifndef GRAPH_UTILS_INCLUDED
 #define GRAPH_UTILS_INCLUDED
 
-
+#define PRED 1
+#define DESC 2
+#define BLANK 0
 //-------------------------------Linked lists--------------------------
 
 typedef struct arc_t{
@@ -15,17 +17,18 @@ typedef struct Node{
 	struct Node *next;			//the next node in the list
 	struct Node *prev;			//the prev node in the list
 
-	// int num_parents;			//number of direct predecessors
-// 	int num_children;			//number of direct descendants
 	arc_t *parents;		//list of the direct predecessors
 	arc_t *children;		//list of the direct descendants
-
+	
+	struct Node *desc_status;	//indicator of allready discoverd vertices
+	struct Node *pred_status;
+	struct Node *SCC_status;
 }Node;
 
 
 typedef struct LinkedList{
 	int num_vert;			//number of vertices in graph
-//	int capasity;			//the capasity of the list
+
 	Node *first;			//pointer to the first node in the graph
 	Node *last;
 }LinkedList;
@@ -50,6 +53,7 @@ void free_graph(LinkedList *graph);
 
 //Importing graph from text-file
 LinkedList* importGridLinked(char* file);
+LinkedList* convertGrid(int *ia,int size_ia , int *ja);
 
 //Printing
 void printNode(Node *node);
@@ -57,10 +61,13 @@ void printLinkedList(LinkedList *graph);
 void printNodeParents(Node *node);
 void printLinkedListPredecessors(LinkedList *graph);
 void printNode_pointers(Node_pointers* pointers);
+void printLinkedListSequence(LinkedList *graph);
 
 //Read and check stuff
 bool isIn(LinkedList *G, Node *node);
 Node* get_Node(LinkedList *graph,int vert_num);
+Node* get_pivot(LinkedList *graph, int num_in_graph);
+
 
 //Remove nodes and edges
 void remove_node(LinkedList *G,Node* node);
@@ -68,6 +75,11 @@ void remove_edge(Node* source, Node* terminal);
 void remove_forward_edges(Node* node);
 void remove_backwards_edges(Node* node);
 LinkedList* remove_from_graph(LinkedList* graph, Node_pointers* sub_graph);
+void removeMarked(LinkedList *G, LinkedList *desc, LinkedList *pred);
+
+//Merge LinkedLists
+void appendLinkedLists(LinkedList *first, LinkedList *second);
+LinkedList* mergeLinkedLists(LinkedList **listOfLists, int n);
 
 //-------------------------------Adjecancy lists-----------------------
 

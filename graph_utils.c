@@ -31,6 +31,10 @@ Node* new_Node(int vert_num){
 	
 	new->next=NULL;
 	new->prev=NULL;
+
+	new->desc_status=NULL;
+	new->pred_status=NULL;
+	new->SCC_status=NULL;
 	return new;
 }
 
@@ -66,24 +70,6 @@ void add_edge(Node *source, Node *terminal){
 		}
 		current->next=backwards;
 	}
-	// if(source->num_children==0){
-// 		source->num_children=1;
-// 		source->children=(Node**)malloc(sizeof(Node*));
-// 		source->children[0]=terminal;
-// 	}else{
-// 		source->num_children++;
-// 		source->children=realloc(source->children,sizeof(Node*)*source->num_children);
-// 		source->children[source->num_children-1]=terminal;
-// 	}
-// 	if(terminal->num_parents==0){
-// 		terminal->num_parents=1;
-// 		terminal->parents=(Node**)malloc(sizeof(Node*));
-// 		terminal->parents[0]=source;
-// 	}else{
-// 		terminal->num_parents++;
-// 		terminal->parents=realloc(terminal->parents,sizeof(Node*)*terminal->num_parents);
-// 		terminal->parents[terminal->num_parents-1]=source;
-// 	}
 }
 
 //add an node to the graph
@@ -105,17 +91,22 @@ void add_node(LinkedList *graph,Node *node){
 		node->next=NULL;
 	}
 	
-// // 	if(graph->capasity==0){
-// // 		graph->capasity=INITIALIZING_SIZE;
-// // 		graph->nodes=(Node**)malloc(sizeof(Node*)*graph->capasity);
-// // 	}
-// // 	if(graph->capasity==graph->num_vert){
-// // 		graph->capasity*=2;
-// // 		graph->nodes=realloc(graph->nodes,graph->capasity*sizeof(Node*));
-// // 	}
-// // 	graph->nodes[graph->num_vert]=node;
-// // 	node->list_index=graph->num_vert;
-// // 	graph->num_vert++;
+}
+Node* get_pivot(LinkedList *graph, int num_in_graph){
+	if(graph->last==NULL){
+		printf("Last is NULL\n");
+	}
+	if(graph->first==NULL){
+		printf("get_pivot __ ERROR: Empty graph.G->num_vert=%d \n",graph->num_vert);
+		return NULL;
+	}
+	printf("G->num_vert is %d, we want %d\n",graph->num_vert,num_in_graph);
+	Node *iterator=graph->first;
+	for(int i=0;i<num_in_graph;++i){
+		iterator=iterator->next;
+		printf("%d \n",i);
+	}
+	return iterator;
 }
 
 Node* get_Node(LinkedList *graph,int vert_num){
@@ -194,12 +185,24 @@ void free_node(Node *node){
 	free(node);
 }
 
-// void free_graph(LinkedList *graph){
-// 	for(int i=0; i<graph->num_vert;i++){
-// 		free_node(graph->nodes[i]);
-// 	}
-// 	free(graph->nodes);
-// }
+LinkedList* convertGrid(int *ia,int size_ia , int *ja){
+	LinkedList *G=new_LinkedList();
+	Node **pointers=(Node**)malloc(sizeof(Node*)*size_ia);
+	for(int i=0; i<size_ia;i++){
+		pointers[i]=new_Node(i);
+		add_node(G,pointers[i]);
+	}
+	for(int i=0;i<size_ia;i++){
+		if(!i%1000){			
+			printf("%d\n",i*100/size_ia);
+		}
+		for(int j=ia[i];j<ia[i+1];j++){
+			add_edge(pointers[i],pointers[ja[j]]);
+		}
+	}
+	free(pointers);
+	return G;
+}
 
 
 //Read a .csv file an make a directed graph in sparse matrix format
@@ -274,6 +277,22 @@ void printLinkedList(LinkedList *graph){
 		node=node->next;
 	}
 }
+
+void printLinkedListSequence(LinkedList *graph){
+	if(graph->num_vert==0){
+//		printf("Empty list \n");
+		return;
+	}
+	//printf("First is: %d, last is: %d\n",graph->first->vert_num,graph->last->vert_num);
+	Node* node=graph->first;
+	int i=0;
+	while(node!=NULL){
+		printf("%d : %d\n",i++,node->vert_num);
+		node=node->next;
+	}
+}
+
+
 
 void printNode(Node *node){
 	if(node==NULL){
@@ -355,34 +374,28 @@ void remove_node(LinkedList *G,Node* node){
 		printf("No nodes to remove\n");
 		return;
 	}
-//	printf("To be removed: %d. %d nodes in G\n",node->vert_num,G->num_vert);
 	//remove edges
 	remove_forward_edges(node);
 	remove_backwards_edges(node);
 	//remove node
 	if(G->first->vert_num==node->vert_num){
-		//printf("First\n");
-		if(node->next!=NULL){
+		if(node->vert_num==G->last->vert_num){
+			G->first=NULL;
+			G->last=NULL;
+			G->num_vert=0;
+			return;
+		}
+		if(node->next){
 			node->next->prev=NULL;
 		}
 		G->first=node->next;
 	}else if(G->last->vert_num==node->vert_num){
-		//printf("Last\n");
-		G->last=node->prev;
 		node->prev->next=NULL;
+		G->last=node->prev;
 	}else{
-		//printf("Third option\n");
-	//	if(node->next==NULL){
-		//	printf("next is NULL. Node is: %d, the last is %d\n",node->vert_num,G->last->vert_num);
-		//	printLinkedList(G);
-	//	}
 		node->next->prev=node->prev;
-	//	if(node->prev==NULL){
-	//		printf("prev is NULL\n");
-	//	}
 		node->prev->next=node->next;
 	}
-	//printf("Removed %d\n",node->vert_num);
 	G->num_vert--;
 	
 }
@@ -471,6 +484,27 @@ LinkedList* remove_from_graph(LinkedList* graph, Node_pointers* sub_graph){
 	return SCC;
 }
 
+void removeMarked(LinkedList *G, LinkedList *desc, LinkedList *pred){
+	Node *current=G->first;	
+	while(current){
+		if(current->SCC_status){
+			
+			remove_node(desc,current->desc_status);
+			remove_node(pred,current->pred_status);
+			remove_node(G,current);
+			
+			current=current->next;
+			continue;
+		}
+		if(current->pred_status || current->desc_status){
+			remove_node(G,current);
+			current=current->next;
+			continue;
+		}
+		current=current->next;
+	}
+}
+
 void printNode_pointers(Node_pointers* pointers){
 	printf("Start\n");
 	for(int i=0;i<pointers->size;i++){
@@ -478,6 +512,35 @@ void printNode_pointers(Node_pointers* pointers){
 	}
 	printf("Done\n");
 }
+
+//appends linkedList to existing one
+void appendLinkedLists(LinkedList *first, LinkedList *second){
+	if(second->first!=NULL){
+		if(first->first==NULL){
+			second->first->prev=first->last;
+			first->first=second->first;
+			first->last=second->last;
+		}else{
+			second->first->prev=first->last;
+			first->last->next=second->first;
+			first->last=second->last;
+		}
+	}
+	first->num_vert+=second->num_vert;	
+	free(second);
+}
+
+//merges n LinkedList into one using the 
+LinkedList* mergeLinkedLists(LinkedList **listOfLists, int n){
+	
+	for(int i=1; i<n;i++){
+		appendLinkedLists(listOfLists[0],listOfLists[i]);
+	}
+	return listOfLists[0];
+}
+
+
+
 
 //--------------------------ADJECACY LISTS -------------------------------------------
 

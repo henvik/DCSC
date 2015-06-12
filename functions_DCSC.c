@@ -9,6 +9,91 @@
 #include"DCSC.h"
 
 
+VisitStack* new_VisitStack(){
+	VisitStack *new = malloc(sizeof(VisitStack));
+	new->top=NULL;
+	return new;
+}	
+
+StackNode* new_StackNode(Node* pointer){
+	StackNode *new=malloc(sizeof(StackNode));
+	new->pointer=pointer;
+	new->next=NULL;
+}
+
+void push_VisitStack(VisitStack *s,StackNode *n){
+	n->next=s->top;
+	s->top=n;
+}
+Node* pop_VisitStack(VisitStack *s){
+	if(s->top==NULL){
+		return NULL;
+	}
+	StackNode *tmp=s->top;
+	s->top=tmp->next;
+	return tmp->pointer;
+}
+
+void clearStatuses(LinkedList *G){
+	Node *current=G->first;
+	while(current){
+		current->desc_status=NULL;
+		current->pred_status=NULL;
+		current->SCC_status=NULL;
+		current=current->next;
+	}
+}
+
+void  FindDescendants(Node *pivot, LinkedList *desc, VisitStack *stack){
+	
+	arc_t *current;
+	while(pivot){
+
+		pivot->desc_status=new_Node(pivot->vert_num);
+		add_node(desc,pivot->desc_status);
+		current=pivot->children;
+		while(current){
+			if(current->head->desc_status){
+				add_edge(pivot->desc_status,current->head->desc_status);
+				current=current->next;
+				continue;
+			}
+			push_VisitStack(stack,new_StackNode(current->head));
+			current=current->next;
+		}
+		pivot=pop_VisitStack(stack);		
+	}
+
+} 
+
+void FindPredecessors(Node *pivot, LinkedList *pred,LinkedList *SCC, VisitStack *stack){
+	
+	arc_t *current;
+	while(pivot){
+		pivot->pred_status=new_Node(pivot->vert_num);
+		add_node(pred,pivot->pred_status);
+		if(pivot->desc_status){
+			pivot->SCC_status=new_Node(pivot->vert_num);
+ 			add_node(SCC,pivot->SCC_status);
+		}
+		current=pivot->parents;
+		while(current){
+			if(current->head->pred_status){
+				add_edge(current->head->pred_status,pivot->pred_status);
+				if(current->head->SCC_status && pivot->SCC_status){
+					add_edge(current->head->SCC_status,pivot->SCC_status);
+				}
+				current=current->next;
+				continue;
+			}
+			push_VisitStack(stack,new_StackNode(current->head));
+			current=current->next;
+		}
+		pivot=pop_VisitStack(stack);
+	}
+}
+
+
 Node* find_descendants(Node *node, LinkedList *desc, Node_pointers *store){
 	Node* new=new_Node(node->vert_num);
 	add_node(desc,new);
@@ -57,71 +142,8 @@ Node* find_predecessors(Node *node, LinkedList *pred, Node_pointers *store){
 	return new;
 }
 
-LinkedList* findDescendants( Node *pivot){
-	
-	Node* pivotCopy =copy_Node(pivot);
-	remove_backwards_edges(pivot);
-	LinkedList* desc=new_LinkedList(0);
-	add_node(desc,pivotCopy);
-	visitChildren(desc,pivotCopy);
-	return desc;
-}
 
-void visitChildren( LinkedList *desc, Node *node){
-	arc_t* current=node->children;
-	
-	while(current!=NULL){
-		if(isIn(desc,current->head)){
-			current=current->next;
-			continue;
-		}
-		add_node(desc,current->head);
-		visitChildren(desc,current->head);
-		current=current->next;
-	}
-	
-	// for(int i=0;i<node->num_children;i++){
-// 		if(isIn(desc,node->children[i])){
-// 			continue;
-// 		}
-// 		add_node(desc,node->children[i]);
-// 		visitChildren(desc,node->children[i]);
-// 	}
-// 	
-}
- 
-LinkedList* findPredecessors( Node *pivot){
 
-	Node* pivotCopy =copy_Node(pivot);
-	remove_forward_edges(pivot);
-	LinkedList* pred=new_LinkedList(0);
-	add_node(pred,pivotCopy);
-	visitParents(pred,pivotCopy);
-	return pred;
-
-}
-
-void visitParents( LinkedList *pred, Node *node){
-	arc_t* current=node->parents;
-	while(current!=NULL){
-		if(isIn(pred,current->head)){
-			current=current->next;
-			continue;
-		}
-		add_node(pred,current->head);
-		visitParents(pred,current->head);
-		current=current->next;
-	}
-	
-// 	for(int i=0;i<node->num_parents;i++){
-// 		if(isIn(pred,node->parents[i])){
-// 			continue;
-// 		}
-// 		add_node(pred,node->parents[i]);
-// 		visitParents(pred,node->parents[i]);
-// 	}
-	
-}
 Node_pointers* new_Node_pointers(){
 	Node_pointers *new =malloc(sizeof(Node_pointers));
 	new->list=malloc(sizeof(Node*)*4);
