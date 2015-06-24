@@ -29,9 +29,11 @@ Node* pop_VisitStack(VisitStack *s){
 	if(s->top==NULL){
 		return NULL;
 	}
-	StackNode *tmp=s->top;
-	s->top=tmp->next;
-	return tmp->pointer;
+	Node *tmp=s->top->pointer;
+	StackNode* del = s->top;
+	s->top=s->top->next;
+	free(del);
+	return tmp;
 }
 
 void clearStatuses(LinkedList *G){
@@ -39,7 +41,6 @@ void clearStatuses(LinkedList *G){
 	while(current){
 		current->desc_status=NULL;
 		current->pred_status=NULL;
-		current->SCC_status=NULL;
 		current=current->next;
 	}
 }
@@ -47,10 +48,10 @@ void clearStatuses(LinkedList *G){
 void  FindDescendants(Node *pivot, LinkedList *desc, VisitStack *stack){
 	
 	arc_t *current;
+	pivot->desc_status=new_Node(pivot->vert_num);
+	add_node(desc,pivot->desc_status);
 	while(pivot){
 
-		pivot->desc_status=new_Node(pivot->vert_num);
-		add_node(desc,pivot->desc_status);
 		current=pivot->children;
 		while(current){
 			if(current->head->desc_status){
@@ -58,6 +59,9 @@ void  FindDescendants(Node *pivot, LinkedList *desc, VisitStack *stack){
 				current=current->next;
 				continue;
 			}
+			current->head->desc_status=new_Node(current->head->vert_num);
+			add_node(desc,current->head->desc_status);
+			add_edge(pivot->desc_status,current->head->desc_status);
 			push_VisitStack(stack,new_StackNode(current->head));
 			current=current->next;
 		}
@@ -66,26 +70,22 @@ void  FindDescendants(Node *pivot, LinkedList *desc, VisitStack *stack){
 
 } 
 
-void FindPredecessors(Node *pivot, LinkedList *pred,LinkedList *SCC, VisitStack *stack){
+void FindPredecessors(Node *pivot, LinkedList *pred, VisitStack *stack){
 	
 	arc_t *current;
+	pivot->pred_status=new_Node(pivot->vert_num);
+	add_node(pred,pivot->pred_status);
 	while(pivot){
-		pivot->pred_status=new_Node(pivot->vert_num);
-		add_node(pred,pivot->pred_status);
-		if(pivot->desc_status){
-			pivot->SCC_status=new_Node(pivot->vert_num);
- 			add_node(SCC,pivot->SCC_status);
-		}
 		current=pivot->parents;
 		while(current){
 			if(current->head->pred_status){
 				add_edge(current->head->pred_status,pivot->pred_status);
-				if(current->head->SCC_status && pivot->SCC_status){
-					add_edge(current->head->SCC_status,pivot->SCC_status);
-				}
 				current=current->next;
 				continue;
 			}
+			current->head->pred_status=new_Node(current->head->vert_num);
+			add_node(pred,current->head->pred_status);
+			add_edge(current->head->pred_status,pivot->pred_status);
 			push_VisitStack(stack,new_StackNode(current->head));
 			current=current->next;
 		}

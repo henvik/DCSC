@@ -13,7 +13,7 @@
 
 //------------------------------------LINKED LISTS --------------------------------------------
 
-
+/* Creates a new instance of the structure LinkedList on the heap. Returns a pointer to it's location. */
 LinkedList* new_LinkedList(){
 	LinkedList *new=malloc(sizeof(LinkedList));
 	new->num_vert=0;
@@ -21,7 +21,7 @@ LinkedList* new_LinkedList(){
 	new->last=NULL;
 	return new;
 }
-
+/* Creates a new instance of the structure Node on the heap. Returns a pointer to it's location.  */
 Node* new_Node(int vert_num){
 	Node* new=(Node*)malloc(sizeof(Node));
 	new->vert_num=vert_num;
@@ -34,7 +34,6 @@ Node* new_Node(int vert_num){
 
 	new->desc_status=NULL;
 	new->pred_status=NULL;
-	new->SCC_status=NULL;
 	return new;
 }
 
@@ -42,7 +41,7 @@ Node* new_Node(int vert_num){
 
 
 
-//adds an edge from source to terminal
+/* Adds an edge from the source to the terminal node */
 void add_edge(Node *source, Node *terminal){
 	arc_t *forward=malloc(sizeof(arc_t));
 	forward->head=terminal;
@@ -100,11 +99,9 @@ Node* get_pivot(LinkedList *graph, int num_in_graph){
 		printf("get_pivot __ ERROR: Empty graph.G->num_vert=%d \n",graph->num_vert);
 		return NULL;
 	}
-	printf("G->num_vert is %d, we want %d\n",graph->num_vert,num_in_graph);
 	Node *iterator=graph->first;
 	for(int i=0;i<num_in_graph;++i){
 		iterator=iterator->next;
-		printf("%d \n",i);
 	}
 	return iterator;
 }
@@ -161,28 +158,28 @@ Node* copy_Node(Node *node){
 }
 
 
-void free_node(Node *node){
-	if(node->children!=NULL){
-		arc_t* to_be_del=node->children;
-		arc_t* current=node->children->next;
+void free_node(Node **node){
+	if((*node)->children){
+		arc_t* to_be_del=(*node)->children;
+		arc_t* current=(*node)->children->next;
 		while(current!=NULL){
 			free(to_be_del);
 			to_be_del=current;
 			current=current->next;
 		}
 	}
-	if(node->parents!=NULL){
-		arc_t* to_be_del=node->parents;
-		arc_t* current=node->parents->next;
+	if((*node)->parents){
+		arc_t* to_be_del=(*node)->parents;
+		arc_t* current=(*node)->parents->next;
 		while(current!=NULL){
 			free(to_be_del);
 			to_be_del=current;
 			current=current->next;
 		}
 	}
-	free(node->parents);
-	free(node->children);
-	free(node);
+//	free(node->parents);
+//	free(node->children);
+	free(*node);
 }
 
 LinkedList* convertGrid(int *ia,int size_ia , int *ja){
@@ -396,6 +393,7 @@ void remove_node(LinkedList *G,Node* node){
 		node->next->prev=node->prev;
 		node->prev->next=node->next;
 	}
+	
 	G->num_vert--;
 	
 }
@@ -484,25 +482,44 @@ LinkedList* remove_from_graph(LinkedList* graph, Node_pointers* sub_graph){
 	return SCC;
 }
 
-void removeMarked(LinkedList *G, LinkedList *desc, LinkedList *pred){
+void removeMarked(LinkedList *G, LinkedList *desc, LinkedList *pred, LinkedList *SCC){
 	Node *current=G->first;	
+	Node *tmp;
 	while(current){
-		if(current->SCC_status){
-			
+		if(current->desc_status && current->pred_status){
+			add_node(SCC,new_Node(current->desc_status->vert_num));
+			tmp=current->next;
 			remove_node(desc,current->desc_status);
 			remove_node(pred,current->pred_status);
 			remove_node(G,current);
-			
-			current=current->next;
+			free_node(&current->desc_status);
+			free_node(&current->pred_status);
+			free_node(&current);
+			current=tmp;
 			continue;
 		}
-		if(current->pred_status || current->desc_status){
+		 if(current->pred_status || current->desc_status){
+			tmp=current->next;
 			remove_node(G,current);
-			current=current->next;
+			free_node(&current);
+			current=tmp;
 			continue;
 		}
 		current=current->next;
 	}
+}
+
+void free_LinkedList(LinkedList **G){
+	Node *current=(*G)->first;
+	Node *tmp;
+	while(current){
+		remove_node(*G,current);
+		tmp=current->next;
+		free_node(&current);
+		current=tmp;
+	}
+	free(*G);
+	*G=NULL;
 }
 
 void printNode_pointers(Node_pointers* pointers){
@@ -514,27 +531,26 @@ void printNode_pointers(Node_pointers* pointers){
 }
 
 //appends linkedList to existing one
-void appendLinkedLists(LinkedList *first, LinkedList *second){
-	if(second->first!=NULL){
+void appendLinkedLists(LinkedList *first, LinkedList **second){
+	if((*second)->first!=NULL){
 		if(first->first==NULL){
-			second->first->prev=first->last;
-			first->first=second->first;
-			first->last=second->last;
+			first->first=(*second)->first;
+			first->last=(*second)->last;
 		}else{
-			second->first->prev=first->last;
-			first->last->next=second->first;
-			first->last=second->last;
+			(*second)->first->prev=first->last;
+			first->last->next=(*second)->first;
+			first->last=(*second)->last;
 		}
 	}
-	first->num_vert+=second->num_vert;	
-	free(second);
+	first->num_vert+=(*second)->num_vert;	
+	free(*second);
 }
 
 //merges n LinkedList into one using the 
 LinkedList* mergeLinkedLists(LinkedList **listOfLists, int n){
 	
 	for(int i=1; i<n;i++){
-		appendLinkedLists(listOfLists[0],listOfLists[i]);
+		appendLinkedLists(listOfLists[0],&listOfLists[i]);
 	}
 	return listOfLists[0];
 }
@@ -661,5 +677,6 @@ void importGrid(char* file, int **ia, int **ja, int *nv, int *ne){
 	*ia=Pia;
 	*ja=Pja;
 	*ne=jaINDEX;
+	free(buffer);
 	fclose(fp);
 }

@@ -26,7 +26,7 @@ Node* find_descendants(Node *node, LinkedList *desc, Node_pointers *store);
 Node* find_predecessors(Node *node, LinkedList *pred, Node_pointers *store);
 
 void  FindDescendants(Node *pivot, LinkedList *desc, VisitStack *stack);
-void FindPredecessors(Node *pivot, LinkedList *pred,LinkedList *SCC, VisitStack *stack);
+void FindPredecessors(Node *pivot, LinkedList *pred, VisitStack *stack);
 
 Node_pointers* find_union(LinkedList* pred, LinkedList *desc);
 

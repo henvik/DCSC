@@ -16,41 +16,44 @@
 
 
 int main(int argc, char* argv[]){
-	int n_threads = omp_get_num_threads();
+	int n_threads = atoi(argv[1]);
+	omp_set_num_threads(n_threads);
+	omp_set_nested(true);
 	printf("Test implementation of DCSC with %d threads. \n",n_threads);
 	//seeding the random number generator, used for picking a pivot vertex.
 	srand ( time(NULL) );
 
 	//Imports the graph from a CSV file.
 	int *ia,*ja,nv,ne;
-	importGrid("Grids/graphRand100x100.txt",&ia,&ja,&nv,&ne);
-	//printf("test %d \n",ia[rand()%nv]);
+	importGrid("TestGrids/test16x16x16.txt",&ia,&ja,&nv,&ne);
 	LinkedList *G=convertGrid(ia,nv,ja);
-//	LinkedList *G=importGridLinked("Grids/graphRand1000x1000.txt");
+	free(ia);
+	free(ja);
 	printf("Size of graph is %d. \n",G->num_vert);
-	//	printLinkedList(G);
 
 	//A cutoff specifying for what size of the graph we will no longer do recursions in parallel.
-	int cutoff=100; //has to be tuned
-	
+	int cutoff=G->num_vert/10; //has to be tuned
+	printf("Cutoff is %d. \n",cutoff);
 	//timing
 	clock_t begin, end;
 	double time_spent;
 
 	begin = clock();
 	LinkedList *order;
-	#pragma omp parallel
+	#pragma omp parallel num_threads(n_threads)
 	{
-		#pragma omp single nowait
+		#pragma omp single
 		{
 			order =DCSC_parallel(G,cutoff);
 		}
+
 	}
 	end = clock();
 	time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 	printf("DCSC took: %f \n",time_spent);
 	//printLinkedListSequence(order);
-
+	
+	free_LinkedList(&order);
 	return 0;
 }
 
@@ -64,53 +67,49 @@ LinkedList* DCSC_parallel(LinkedList* G, int cutoff){
 	}
 
 /*Finding pivot node. */
-	int random=rand()%G->num_vert;
-	Node *pivot=get_pivot(G,random);
+	Node *pivot=get_pivot(G,rand()%G->num_vert);
 	if(!pivot){
-		printf("get_Node error. Size: %d and random %d\n",G->num_vert,random);
+		printf("get_Node error.\n");
 		exit(0);
 	}
 
 /*Finding descendants and predecessors of the pivot node. Save the nodes that are to be removed 
 in to_be_removed_G. 
 */ 
-//	Node_pointers *to_be_removed_G=new_Node_pointers();
-	VisitStack *stack=new_VisitStack();
+	VisitStack *desc_stack=new_VisitStack();
+	VisitStack *pred_stack=new_VisitStack();
 	LinkedList *desc=new_LinkedList();
 	LinkedList *SCC=new_LinkedList();
-	//find_descendants(pivot,desc, to_be_removed_G);
-	FindDescendants(pivot,desc,stack);
 	LinkedList *pred=new_LinkedList();
-//	find_predecessors(pivot,pred,to_be_removed_G);
-	FindPredecessors(pivot,pred,SCC,stack);
-/* Finding the union of desc and pred. saving nodes that have to be removed from the pred and desc sets.*/		
-//	Node_pointers *to_be_removed_desc= find_union(pred,desc);
-//	Node_pointers *to_be_removed_pred=find_union(desc,pred);
-
-
-
-/* Remove the nodes of the SCC completely, at the same time as creating a new SCC to return. */
-	//printNode_pointers(to_be_removed_G);
-
-//	LinkedList *SCC=remove_from_graph(pred,to_be_removed_pred);
-//	remove_from_graph(desc,to_be_removed_desc);
-//	remove_from_graph(G,to_be_removed_G);
-	
-	//printf("SCC\n");
+	#pragma omp task shared(desc)
+	{
+		FindDescendants(pivot,desc,desc_stack);
+	}
+	#pragma omp task shared(pred)
+	{
+		FindPredecessors(pivot,pred,pred_stack);
+	}
+	#pragma omp taskwait
+	free(desc_stack),free(pred_stack);
 //	printLinkedList(SCC);
-	removeMarked(G,desc,pred);
+	removeMarked(G,desc,pred,SCC);
 	LinkedList *listOfLists[4];
-	
 //	Recursion
 
 
 LinkedList *predReturn, *remReturn, *descReturn;
-        #pragma omp task shared(predReturn) 
+        #pragma omp task shared(predReturn)
+	{
 		predReturn =DCSC_parallel(pred,cutoff);
+	}
         #pragma omp task shared(remReturn)
-			remReturn =	DCSC_parallel(G,cutoff);
-	#pragma omp task shared(descReturn) 
-			descReturn=	DCSC_parallel(desc,cutoff);
+	{
+		remReturn =DCSC_parallel(G,cutoff);
+	}
+	#pragma omp task shared(descReturn)
+	{
+		descReturn=DCSC_parallel(desc,cutoff);
+	}
 	#pragma omp taskwait
 	listOfLists[0]=predReturn;	
 	listOfLists[1]=	remReturn;
@@ -128,43 +127,27 @@ LinkedList* DCSC_serial(LinkedList* G){
 	}
 
 /*Finding pivot node. */
-	int random=rand()%G->num_vert;
-	Node *pivot=get_pivot(G,random);
+	Node *pivot=get_pivot(G,rand()%G->num_vert);
 	if(!pivot){
-		printf("get_Node error. Size: %d and random %d\n",G->num_vert,random);
+		printf("get_Node error\n");
 		exit(0);
 	}
 
 /*Finding descendants and predecessors of the pivot node. Save the nodes that are to be removed 
 in to_be_removed_G. 
 */ 
-	//Node_pointers *to_be_removed_G=new_Node_pointers();
 	LinkedList *SCC=new_LinkedList();	
 	LinkedList *desc=new_LinkedList();
 	LinkedList *pred=new_LinkedList();
 	VisitStack *stack=new_VisitStack();
-//	find_descendants(pivot,desc, to_be_removed_G);
+
 	FindDescendants(pivot,desc,stack);
-	FindPredecessors(pivot,pred,SCC,stack);
-//	find_predecessors(pivot,pred,to_be_removed_G);
+	FindPredecessors(pivot,pred,stack);
+	free(stack);
 
-/* Finding the union of desc and pred. saving nodes that have to be removed from the pred and desc sets.*/		
-	//Node_pointers *to_be_removed_desc= find_union(pred,desc);
-	//Node_pointers *to_be_removed_pred=find_union(desc,pred);
-
-
-
-/* Remove the nodes of the SCC completely, at the same time as creating a new SCC to return. */
-	//printNode_pointers(to_be_removed_G);
-
-//	LinkedList *SCC=remove_from_graph(pred,to_be_removed_pred);
-//	remove_from_graph(desc,to_be_removed_desc);
-//	remove_from_graph(G,to_be_removed_G);
-	
-//	printf("SCC\n");
 //	printLinkedList(SCC);
 
-	removeMarked(G,desc,pred);
+	removeMarked(G,desc,pred,SCC);
 	
 	LinkedList *listOfLists[4];
 	
